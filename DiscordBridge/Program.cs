@@ -7,6 +7,7 @@ using System.Net.Http;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Web;
 using Discord;
 using Discord.Webhook;
 using Discord.WebSocket;
@@ -159,15 +160,18 @@ namespace DiscordBridge
                             }.Build());
                         }
 
+                    var member = _client.ServersCache.Find(x => x._id == channel.RevoltServerId)?.MemberCache.Find(x => x._id?.User == message.Author._id);
+                    var avaUrl = (member == null || member.Avatar == null) ? null : $"{_client.AutumnUrl}/{member.Avatar.Tag}/{member.Avatar._id}/{HttpUtility.UrlEncode(member.Avatar.Filename)}?size=256";
+
                     var msg = await channel.DiscordWebhook.SendMessageAsync(
                         string.IsNullOrEmpty(message.Content) && message.Attachments?.Length == 1
                             // message is empty and has only a single attachment, send attachment url
                             ? message.Attachments.First().Url
                             : message.Content.ReplaceRevoltMentions().ReplaceRevoltChannelMentions(),
-                        username: message.Author.Username,
-                        avatarUrl: message.Author.Avatar == null
+                        username: member?.Nickname ?? message.Author.Username,
+                        avatarUrl: avaUrl ?? (message.Author.Avatar == null
                             ? message.Author.DefaultAvatarUrl
-                            : message.Author.AvatarUrl + "?size=256", allowedMentions: new(), embeds: embeds);
+                            : message.Author.AvatarUrl + "?size=256"), allowedMentions: new(), embeds: embeds);
                     RevoltDiscordMessages.Add(message._id, (msg, channel.DiscordChannelId));
                     if (updateReply != null)
                         await updateReply();
@@ -341,7 +345,7 @@ namespace DiscordBridge
 
                     var mask = new MessageMasquerade()
                     {
-                        Name = message.Author.ToString(),
+                        Name = DiscordClient.GetGuild(channel.DiscordServerId)?.GetUser(message.Author.Id)?.Nickname ?? message.Author.ToString(),
                         AvatarUrl = message.Author.GetAvatarUrl() ?? "https://cdn.discordapp.com/embed/avatars/0.png",
                     };
 
