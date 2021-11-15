@@ -160,7 +160,8 @@ namespace DiscordBridge
                             }.Build());
                         }
 
-                    var member = _client.ServersCache.Find(x => x._id == channel.RevoltServerId)?.MemberCache.Find(x => x._id?.User == message.Author._id);
+                    var members = await _client.Servers.GetMembersAsync(channel.RevoltServerId);
+                    var member = Array.Find(members.Members, x => x._id?.User == message.Author._id);
                     var avaUrl = (member == null || member.Avatar == null) ? null : $"{_client.AutumnUrl}/{member.Avatar.Tag}/{member.Avatar._id}/{HttpUtility.UrlEncode(member.Avatar.Filename)}?size=256";
 
                     var msg = await channel.DiscordWebhook.SendMessageAsync(
