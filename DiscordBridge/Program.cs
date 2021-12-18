@@ -43,7 +43,7 @@ namespace DiscordBridge
         public static readonly Regex ReplaceDiscordMentions = new("<@!?[0-9]{1,22}>", RegexOptions.Compiled);
         public static readonly Regex ReplaceDiscordChannelMentions = new("<#[0-9]{1,22}>", RegexOptions.Compiled);
         public static readonly Regex ReplaceDiscordEmotes = new("<a?:.+?:[0-9]{1,22}>", RegexOptions.Compiled);
-        public static readonly Regex RevoltQuoteFix = new(">.*\n(?=.)", RegexOptions.Compiled);
+        public static readonly Regex RevoltQuoteFix = new("(?:>.*\n)+(?=[^>\n])", RegexOptions.Compiled);
 
         static async Task Main()
         {
