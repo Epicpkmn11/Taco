@@ -22,12 +22,11 @@ namespace Taco.Modules
         public Task BotInformation()
         {
             var uptime = DateTime.Now - Program.StartTime;
-            return ReplyAsync($@"[](https://a.c)
-> ## Taco
-> **Developed by:** [Jan0660](/@01EX40TVKYNV114H8Q8VWEGBWQ) (https://github.com/Jan0660)
-> **Repository:** https://github.com/Jan0660/Taco
+            return ReplyAsync($@"> ## Taco
+> **Developed by:** [Jan0660](</@01EX40TVKYNV114H8Q8VWEGBWQ>) (<https://github.com/Jan0660>)
+> **Repository:** <https://github.com/Jan0660/Taco>
 > **Uptime:** {(uptime.Days == 0 ? "" : uptime.Days + " Days")} {uptime.Hours} Hours {uptime.Minutes} Minutes
-> **Latest update at:** {new FileInfo(Assembly.GetExecutingAssembly().Location).LastWriteTime:dd/MM/yyyy}
+> **Latest update at:** <t:{new DateTimeOffset(new FileInfo(Assembly.GetExecutingAssembly().Location).LastWriteTime.ToUniversalTime()).ToUnixTimeSeconds()}:D>
 > **Groups count:** {Message.Client.ChannelsCache.OfType<GroupChannel>().Count()}
 > **Servers count:** {Message.Client.ServersCache.Count}
 > [invite link](<https://app.revolt.chat/bot/{Context.Client.User._id}>)"
@@ -122,7 +121,7 @@ namespace Taco.Modules
             var restPing = stopwatch.ElapsedMilliseconds;
             return ReplyAsync(@$"**REST API Ping:** `{restPing}`ms
 **MongoDB:** `{Mongo.Ping().Result}`ms
-**Websocket Ping:** doesnt exist");
+**Websocket Ping:** `{Context.Client.WebSocketPing}`ms");
         }
 
         [Command("test")]

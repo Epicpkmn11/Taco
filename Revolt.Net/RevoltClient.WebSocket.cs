@@ -14,6 +14,11 @@ namespace Revolt
     public partial class RevoltClient
     {
         /// <summary>
+        /// The WebSocket ping in milliseconds, refreshed around every 30 seconds
+        /// </summary>
+        public long WebSocketPing { get; private set; }
+
+        /// <summary>
         /// Connects the client to the websocket.
         /// </summary>
         public async Task ConnectWebSocketAsync()
@@ -74,6 +79,14 @@ namespace Revolt
 
                             break;
                         }
+                        case "Pong":
+                        {
+                            var pongTime = packet.Value<long>("data");
+                            var time = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                            WebSocketPing = time - pongTime;
+                            _onWebSocketPong.InvokeAsync();
+                            break;
+                        }
                         case "Ready":
                         {
                             State = RevoltClientState.WebSocketReady;
@@ -81,22 +94,23 @@ namespace Revolt
                             _pingTimer = new Timer(30_000d);
                             _pingTimer.Elapsed += (_, _) =>
                             {
+                                var time = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                                 _webSocket.Send(JsonConvert.SerializeObject(new
                                 {
                                     type = "Ping",
-                                    time = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+                                    data = time
                                 }));
                             };
                             _pingTimer.Start();
                             // initialize cache
                             _users = new();
                             _channels = new();
-                            ServersCache = new();
+                            _servers = new();
                             foreach (var userToken in packet["users"]!)
                             {
                                 var user = userToken.ToObject<User>();
                                 user!.AttachClient(this);
-                                _users.Add(user);
+                                _users.TryAdd(user._id, user);
                             }
 
                             foreach (var channelToken in packet["channels"]!)
@@ -104,14 +118,14 @@ namespace Revolt
                                 var channel = _deserializeChannel((JObject)channelToken);
                                 if (channel is MessageChannel { LastMessage: { } } messageChannel)
                                     messageChannel.LastMessage.Client = this;
-                                _channels.Add(channel);
+                                _channels.TryAdd(channel._id, channel);
                             }
 
                             foreach (var serverToken in packet["servers"]!)
                             {
                                 var server = serverToken.ToObject<Server>();
                                 server!.Client = this;
-                                ServersCache.Add(server);
+                                _servers.TryAdd(server._id, server);
                             }
 
                             _onReady.InvokeAsync();
@@ -134,9 +148,10 @@ namespace Revolt
                             var status = (RelationshipStatus)Enum.Parse(typeof(RelationshipStatus),
                                 packet.Value<string>("status")!);
                             // update user if they're in cache
-                            var user = _users.FirstOrDefault(u => u._id == id);
-                            if (user != null)
+                            if (_users.TryGetValue(id, out var user))
+                            {
                                 user.Relationship = status;
+                            }
 
                             _userRelationshipUpdated.InvokeAsync(id, status);
 
@@ -167,7 +182,8 @@ namespace Revolt
                         case "ChannelCreate":
                         {
                             var channel = packet.ToObject<Channel>();
-                            _channels.Add(channel);
+                            // todo: MustAdd
+                            _channels.TryAdd(channel._id, channel);
                             // todo: TextChannel specific handling to add to Server
                             _channelCreate.InvokeAsync(channel);
 
@@ -176,7 +192,7 @@ namespace Revolt
                         case "ChannelUpdate":
                         {
                             var id = packet.Value<string>("id");
-                            var channel = _channels.First(c => c._id == id);
+                            var channel = _channels[id];
                             var data = packet.Value<JObject>("data");
                             if (channel is GroupChannel groupChannel)
                                 if (data!.TryGetValue("icon", out var icon))
@@ -207,9 +223,9 @@ namespace Revolt
                         case "ServerDelete":
                         {
                             var id = packet.Value<string>("id");
-                            var server = ServersCache.FirstOrDefault(s => s._id == id);
+                            var server = _servers[id];
                             if (server != null)
-                                ServersCache.Remove(server);
+                                _servers.TryRemove(server._id, out _);
                             // todo: if not cached only id
                             _serverDeleted.InvokeAsync(server);
                             break;
@@ -219,7 +235,7 @@ namespace Revolt
                             var ids = packet.Value<JObject>("id");
                             var serverId = ids.Value<string>("server");
                             var userId = ids.Value<string>("user");
-                            var server = ServersCache.First(s => s._id == serverId);
+                            var server = _servers[serverId];
                             var memberIndex = server.MemberCache.FindIndex(m => m._id.User == userId);
                             Member cached = null;
                             if (memberIndex != -1)
@@ -251,7 +267,7 @@ namespace Revolt
                         {
                             var serverId = packet.Value<string>("id");
                             var roleId = packet.Value<string>("role_id");
-                            var server = ServersCache.FirstOrDefault(s => s._id == serverId);
+                            var server = _servers[serverId];
                             if (server != null)
                             {
                                 var role = server.Roles[roleId!];
@@ -265,7 +281,7 @@ namespace Revolt
                         {
                             var serverId = packet.Value<string>("id");
                             var roleId = packet.Value<string>("role_id");
-                            var server = ServersCache.FirstOrDefault(s => s._id == serverId);
+                            var server = _servers[serverId];
                             if (server != null)
                             {
                                 // null if role has just been created

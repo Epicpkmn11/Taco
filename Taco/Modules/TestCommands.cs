@@ -30,6 +30,7 @@ namespace Taco.Modules
             return ReplyAsync($@"> ## {user.Username}
 > Mention: [@{user.Username}](/@{user._id})
 > Id: `{user._id}`
+> Created: <t:{Ulid.Parse(user._id).Time.ToUnixTimeSeconds()}:F>
 > Online: {user.Online}
 > Badges: {user.Badges} ({user.BadgesRaw})
 > [\[Default Avatar\]]({user.DefaultAvatarUrl}) [\[Avatar\]]({user.AvatarUrl})");
@@ -141,21 +142,6 @@ namespace Taco.Modules
         //
         //     await ReplyAsync(text);
         // }
-        [Command("roadmap")]
-        public Task Roadmap()
-            => ReplyAsync("Revolt's roadmap is available here: https://revolt.chat/roadmap");
-
-        [Command("weblate")]
-        public Task Weblate()
-            => ReplyAsync("https://weblate.insrt.uk/engage/revolt/?utm_source=taco");
-
-        [Command("session")]
-        public Task Session()
-            => ReplyAsync("https://rvf.geist.ga/posts/Getting-Session-Data");
-
-        [Command("gitlab")]
-        public Task GitLab()
-            => ReplyAsync("https://gitlab.insrt.uk/revolt");
 
         [Command("coc")]
         public Task FullCodeOfConduct() => ReplyAsync("> " + string.Join("\n> ", Program.Config.CodeOfConduct));
@@ -164,26 +150,28 @@ namespace Taco.Modules
         [Alias("perms")]
         public async Task PermissionTest(User user = null)
         {
-            user ??= Context.User;
-            var perms = Context.Server.GetPermissionsFor(user._id);
-
-            StringBuilder res = new();
-            res.Append("> ## Server Permissions\n");
-            foreach (var enumVal in Enum.GetValues<ServerPermission>())
-            {
-                res.AppendLine("> " + (perms.Server.HasFlag(enumVal) ? ":white_check_mark:" : ":x:") +
-                               $" {enumVal.ToString()}");
-            }
-
-            res.Append("> ## Channel Permissions\n");
-            foreach (var enumVal in Enum.GetValues<ChannelPermission>())
-            {
-                res.AppendLine("> " + (perms.Channel.HasFlag(enumVal) ? ":white_check_mark:" : ":x:") +
-                               $" {enumVal.ToString()}");
-            }
-            // todo: this channel permissions
-
-            await ReplyAsync(res.ToString());
+            await InlineReplyAsync("Commands with permissions temporarily disabled.");
+            return;
+            // user ??= Context.User;
+            // var perms = Context.Server.GetPermissionsFor(user._id);
+            //
+            // StringBuilder res = new();
+            // res.Append("> ## Server Permissions\n");
+            // foreach (var enumVal in Enum.GetValues<ServerPermission>())
+            // {
+            //     res.AppendLine("> " + (perms.Server.HasFlag(enumVal) ? ":white_check_mark:" : ":x:") +
+            //                    $" {enumVal.ToString()}");
+            // }
+            //
+            // res.Append("> ## Channel Permissions\n");
+            // foreach (var enumVal in Enum.GetValues<ChannelPermission>())
+            // {
+            //     res.AppendLine("> " + (perms.Channel.HasFlag(enumVal) ? ":white_check_mark:" : ":x:") +
+            //                    $" {enumVal.ToString()}");
+            // }
+            // // todo: this channel permissions
+            //
+            // await ReplyAsync(res.ToString());
         }
 
         [Command("prectest")]

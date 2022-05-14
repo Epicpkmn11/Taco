@@ -122,8 +122,7 @@ namespace DiscordBridge
                         }.Build());
                         updateReply = async () =>
                         {
-                            var msg = await DiscordClient.GetGuild(channel.DiscordServerId)
-                                .GetTextChannel(channel.DiscordChannelId)
+                            var msg = await ((SocketTextChannel)DiscordClient.GetChannel(channel.DiscordChannelId))
                                 .GetMessageAsync(replyToId);
                             embeds[index] = new EmbedBuilder()
                             {
@@ -227,7 +226,11 @@ namespace DiscordBridge
                                    icon,
                         username: "Revolt Bridge");
                 };
-            DiscordClient = new DiscordSocketClient();
+            DiscordClient = new DiscordSocketClient(new DiscordSocketConfig
+            {
+                GatewayIntents = GatewayIntents.GuildMessages | GatewayIntents.GuildMembers |
+                                 GatewayIntents.GuildWebhooks | GatewayIntents.Guilds
+            });
             await DiscordClient.LoginAsync(Discord.TokenType.Bot, Config.DiscordBotToken);
             await DiscordClient.StartAsync();
             DiscordClient.Ready += async () =>
@@ -294,7 +297,11 @@ namespace DiscordBridge
                     {
                         MessageType.GuildMemberJoin => $"{systemMessage.Author} has joined the Discord server.",
                         MessageType.UserPremiumGuildSubscription =>
-                            $"{systemMessage.Author} has boosted the Discord server."
+                            $"{systemMessage.Author} has boosted the Discord server.",
+                        MessageType.ChannelFollowAdd =>
+                            $"**{systemMessage.Author}** has added **{systemMessage.Content}** to this channel.",
+                        MessageType.ThreadCreated =>
+                            $"**{systemMessage.Author}** started a thread: **{systemMessage.Content}**.",
                     };
                     DiscordRevoltMessagesContent.LimitedAdd(content, 50);
                     var msg = await _client.Channels.SendMessageAsync(channel.RevoltChannelId, content);
@@ -311,7 +318,8 @@ namespace DiscordBridge
                 {
                     await message.Channel.SendMessageAsync($@"**DiscordRevoltMessages:** {DiscordRevoltMessages.Count}
 **RevoltDiscordMessages:** {RevoltDiscordMessages.Count}
-**Discord Latency:** {DiscordClient.Latency}");
+**Discord Latency:** {DiscordClient.Latency}
+**Revolt WS Ping:** {_client.WebSocketPing}");
                 }
 
                 try
@@ -365,13 +373,18 @@ namespace DiscordBridge
                         DiscordRevoltMessagesContent.LimitedAdd(content, 50);
                         if (message.Attachments.Any())
                         {
+                            var attachmentIds = new List<string>(5);
                             var http = new HttpClient();
-                            var attachment = await http.GetByteArrayAsync(message.Attachments.First().ProxyUrl);
-                            var attachmentId =
-                                await _client.UploadFile(message.Attachments.First().Filename, attachment);
+                            // Discord's attachment limit 10, while Revolt's is 5 :weary:
+                            foreach (var att in message.Attachments.Count > 5 ? message.Attachments.Take(5) : message.Attachments)
+                            {
+                                var attachment = await http.GetByteArrayAsync(att.Url);
+                                var attachmentId = await _client.UploadFile(att.Filename, attachment);
+                                attachmentIds.Add(attachmentId);
+                            }
                             msg = await _client.Channels.SendMessageAsync(
                                 channel.RevoltChannelId, content,
-                                new() { attachmentId }, isReply ? new[] { reply } : null, mask: mask);
+                                attachmentIds, isReply ? new[] { reply } : null, mask: mask);
                         }
                         else
                             msg = await _client.Channels.SendMessageAsync(channel.RevoltChannelId,
